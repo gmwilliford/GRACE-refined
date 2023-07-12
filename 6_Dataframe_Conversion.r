@@ -1,49 +1,40 @@
 
-#GWS DATAFRAME CONVERSION#
-# Initialize an empty list to store the dataframes
-df_list <- list()
+#GWS RASTER TO DATAFRAME CONVERSION#
+
+# Create an empty list to store the centroid dataframes 
+centroid_list <- list()
 
 # Loop over each raster in the final_list
 for (i in 1:length(final_list)) {
-  # Convert raster to dataframe
-  df <- as.data.frame(final_list[[i]], xy = TRUE)
+  # Get the current raster
+  raster_data <- final_list[[i]]
   
-  # Add the dataframe to the list of dataframes
-  df_list[[i]] <- df
+  # Calculate the centroids of the raster cells
+  centroids <- raster::cellFromXY(raster_data, raster::xyFromCell(raster_data, 1:ncell(raster_data)))
+  
+  # Get the coordinates and values of the centroids
+  centroid_coords <- raster::coordinates(raster_data)[centroids, ]
+  centroid_values <- raster_data[centroids]
+  
+  # Create a dataframe with x, y, and value columns
+  centroid_df <- data.frame(x = centroid_coords[, 1], y = centroid_coords[, 2], value = centroid_values)
+  
+  # Add the centroid dataframe to the list
+  centroid_list[[i]] <- centroid_df
 }
 
-# Combine all dataframes into a single dataframe
-combined_df <- do.call(rbind, df_list)
 
-# # Specify the file path and name for the CSV file
+#COMBINING YEARLY DATAFRAMES# 
+
+# Combine all dataframes into a single dataframe
+combined_df <- do.call(rbind, centroid_list)
+
+
+# WRITING DF TO CSV
+# Specify the file path and name for the CSV file
 csv_file <- "D:/Research/MASTER DATA/GWS CSV/2012_GWSdata.csv"
 
 # # Write the combined dataframe to the CSV file
  write.csv(combined_df, file = csv_file, row.names = FALSE)
 
-
-# Specify the latitude and longitude values for the grid cells of interest
-lat_lon_values <- data.frame(Latitude = c(33.625, 32.375, 35.125),
-                             Longitude = c(-92.875, -92.375, -89.625))
-
-# Initialize an empty list to store the extracted dataframes
-extracted_df_list <- list()
-
-# Loop over each dataframe in the df_list
-for (i in 1:length(df_list)) {
-  # Extract the data for the grid cells of interest
-  extracted_df <- df_list[[i]][df_list[[i]]$x %in% lat_lon_values$Longitude & df_list[[i]]$y %in% lat_lon_values$Latitude, ]
-  
-  # Add the extracted dataframe to the list of extracted dataframes
-  extracted_df_list[[i]] <- extracted_df
-}
-
-# Combine all extracted dataframes into a single dataframe
-extracted_combined_df <- do.call(rbind, extracted_df_list)
-
-# Specify the file path and name for the extracted CSV file
-extracted_csv_file <- "D:/Research/MASTER DATA/GWS CSV/2012_GWSlatlon.csv"
-
-# Write the extracted combined dataframe to the CSV file
-write.csv(extracted_combined_df, file = extracted_csv_file, row.names = FALSE)
 
