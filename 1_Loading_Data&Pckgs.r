@@ -51,14 +51,14 @@ for (i in 1:length(grace_files)) {
 }
 
 
-#MONTHLY GLDAS 
+#MONTHLY GLDAS 1 degree by 1 degree resolution
 folder_path <- "D:/Research/MASTER DATA/GLDAS/1x1/2012"
 file_list <- list.files(path= folder_path, pattern = "*.nc4")
 
 #define the variables to extract
 var_names <- c("Evap_tavg", "Qs_acc", "SWE_inst", "CanopInt_inst", "RootMoist_inst", "SoilMoi0_10cm_inst", "SoilMoi10_40cm_inst", "SoilMoi40_100cm_inst", "SoilMoi100_200cm_inst", "Rainf_f_tavg")
 
-#initialize  empty list to hold the stacked rasters for all gldas 1x1 variables
+#initialize  an empty list to hold the stacked rasters for all gldas 1x1 variables
 gldas1_stacked <- list()
 
 #loop over each yearly .nc4 file
@@ -90,7 +90,7 @@ for (file_name in list.files(folder_path, pattern = "\\.nc4$", full.names = TRUE
 }
 
 
-#MONTHLY GLDAS 0.25x0.25
+#MONTHLY GLDAS at 0.25x0.25 resolution
 
 folder_path025 <- "D:/Research/MASTER DATA/GLDAS/0.25x0.25/2012"
 file025_list <- list.files(path= folder_path, pattern = "*.nc4")
