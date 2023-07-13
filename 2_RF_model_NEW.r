@@ -6,7 +6,7 @@ predictors_df <- predictors_df[, -c(1, 2)] # Exclude x and y columns
 
 #combine all response variables into a single dataframe
 response_df <- do.call(rbind, lapply(grace_clipped_list, function(x) as.data.frame(x, xy = TRUE)))
-response_df <- response_df[, -c(1, 2)] # Exclude x and y columns
+response_df <- response_df[, -c(1, 2)] 
 
 #combine predictors and response into a single dataframe
 model_data <- cbind(predictors_df, response_df)
