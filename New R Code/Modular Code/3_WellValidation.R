@@ -1,4 +1,3 @@
-
 # STEP 3: WELL VALIDATION 
 # This step takes the cleaned well log data (see STEP 2.5) and creates a validation workflow for 
 # smoothing and clustering wells to plot alongside the GRACE-derived GWS
@@ -25,7 +24,7 @@ sy_aq <- tribble(
 
 
 # Load & preprocess well log data table
-well_csv <- "C:/Users/gmwil/OneDrive/Desktop/Ph.D/GRACE 2.0/Well_log/Ozark_Plateaus/ozark_plateaus_clean_yearmonth.csv"
+well_csv <- "C:/Users/gmwil/OneDrive/Desktop/Ph.D/GRACE 2.0/Well_log/MS_embayment/ms_embayment_clean_yearmonth.csv"
 wells_raw <- read.csv(well_csv)
 
 wells <- wells_raw %>%
@@ -46,7 +45,6 @@ SY_global <- 0.20
 
 wells <- wells %>%
   group_by(SiteNo, YearMonth, Latitude, Longitude, AquiferType) %>%
-  filter(AquiferType == "UNCONFINED") %>%
   summarise(head_ft = mean(WaterLevel_NAVD88_ft, na.rm=TRUE), .groups="drop") %>%
   group_by(SiteNo) %>%
   mutate(head_anom_ft = head_ft - mean(head_ft, na.rm=TRUE)) %>%
@@ -90,7 +88,7 @@ wells_monthly <- wells_single %>%
     head_anom_ft  = head_ft - mean(head_ft, na.rm=TRUE),
     head_anom_cm  = head_anom_ft * 0.3048 * 100,
     storage_cm    = head_anom_cm * SY_global,
-    storage_ma2   = rollapply(storage_cm, 2, mean, fill=NA, align="right")
+    storage_ma3   = rollapply(storage_cm, 3, mean, fill=NA, align="right")
   ) %>%
   ungroup() %>%
   left_join(
@@ -105,12 +103,12 @@ wells_monthly <- wells_single %>%
       vals <- raster::extract(r, cbind(x,y), buffer=0.125*111000)[[1]]
       mean(vals, na.rm=TRUE)
     }, Longitude, Latitude, YearMonth_chr),
-    gws_ma2 = rollapply(gws_anom, 2, mean, fill=NA, align="right")
+    gws_ma3 = rollapply(gws_anom, 3, mean, fill=NA, align="right")
   ) %>%
   filter(YearMonth_chr %in% names(gws_lookup)) %>%
-  filter(!is.na(storage_ma2) & !is.na(gws_ma2))
+  filter(!is.na(storage_ma3) & !is.na(gws_ma3))
 
-rmse_cutoff <- quantile(well_stats_raw$rmse, 0.9)
+rmse_cutoff <- quantile(well_stats_raw$rmse, 0.7)
 bad_sites <- well_stats_raw %>% filter(rmse > rmse_cutoff) %>% pull(SiteNo)
 wells_monthly <- wells_monthly %>% filter(!SiteNo %in% bad_sites)
 
@@ -119,7 +117,7 @@ load("wells_monthly_clean.RData")
 
 # K-means clustering
 run_clustering <- function(wells_monthly,
-                           α      = 0.10,   # temporal vs spatial weight
+                           α      = 0.3,   # temporal vs spatial weight
                            w_sil  = 0.5,    # silhouette weight (tightness)
                            w_fit  = 0.5,    # fit weight (correlation)
                            λ      = 0.2,    # cluster‐penalty weight
@@ -131,8 +129,8 @@ run_clustering <- function(wells_monthly,
   
   # Temporal distance
   ts_wide <- wells_monthly %>%
-    dplyr::select(SiteNo, YearMonth, storage_ma2) %>%
-    pivot_wider(names_from=SiteNo, values_from=storage_ma2) %>%
+    dplyr::select(SiteNo, YearMonth, storage_ma3) %>%
+    pivot_wider(names_from=SiteNo, values_from=storage_ma3) %>%
     arrange(YearMonth)
   D_t <- dist(t(scale(as.matrix(ts_wide[,-1]))))
   
@@ -154,12 +152,12 @@ run_clustering <- function(wells_monthly,
   })
   fit_scores <- sapply(k_range, function(k) {
     cl     <- cutree(hc, k=k)
-    lookup <- tibble(SiteNo=as.numeric(names(cl)), cluster=cl)
+    lookup <- tibble(SiteNo= names(cl), cluster=cl)
     ws     <- wells_monthly %>% left_join(lookup, by="SiteNo")
     r_per_cl <- ws %>%
       group_by(cluster, YearMonth) %>%
-      summarise(ms = mean(storage_ma2, na.rm=TRUE),
-                mg = mean(gws_ma2,     na.rm=TRUE),
+      summarise(ms = mean(storage_ma3, na.rm=TRUE),
+                mg = mean(gws_ma3,     na.rm=TRUE),
                 .groups="drop") %>%
       group_by(cluster) %>%
       summarise(r = cor(ms, mg, use="pairwise.complete.obs"), .groups="drop") %>%
@@ -201,8 +199,8 @@ summarize_clusters <- function(wells_clust) {
   perf <- wells_clust %>%
     group_by(cluster, YearMonth) %>%
     summarise(
-      ms = mean(storage_ma2, na.rm=TRUE),
-      mg = mean(gws_ma2),
+      ms = mean(storage_ma3, na.rm=TRUE),
+      mg = mean(gws_ma3),
       .groups="drop"
     ) %>%
     group_by(cluster) %>%
@@ -215,8 +213,8 @@ summarize_clusters <- function(wells_clust) {
   well_stats <- wells_clust %>%
     group_by(cluster, SiteNo) %>%
     summarise(
-      r    = cor(storage_ma2, gws_ma2, use="pairwise.complete.obs"),
-      rmse = sqrt(mean((storage_ma2 - gws_ma2)^2, na.rm=TRUE)),
+      r    = cor(storage_ma3, gws_ma3, use="pairwise.complete.obs"),
+      rmse = sqrt(mean((storage_ma3 - gws_ma3)^2, na.rm=TRUE)),
       .groups="drop"
     )
   
@@ -250,8 +248,8 @@ plot_time_series <- function(cluster_id, wells_clust) {
   mean_ts <- df %>%
     group_by(YearMonth) %>%
     summarise(
-      mean_storage = mean(storage_ma2, na.rm=TRUE),
-      mean_gws     = mean(gws_ma2,    na.rm=TRUE),
+      mean_storage = mean(storage_ma3, na.rm=TRUE),
+      mean_gws     = mean(gws_ma3,    na.rm=TRUE),
       .groups      = "drop"
     )
   
@@ -262,7 +260,7 @@ plot_time_series <- function(cluster_id, wells_clust) {
   ggplot() +
     geom_line(
       data = df,
-      aes(x = YearMonth, y = storage_ma2, group = SiteNo),
+      aes(x = YearMonth, y = storage_ma3, group = SiteNo),
       color = "grey80", alpha = 0.6
     ) +
     geom_line(
@@ -335,4 +333,3 @@ plot_clusters_map(clust_res$wells_clustered, state_boundaries)
 
 # plot one cluster (or group of clusters)):
 plot_clusters_map(clust_res$wells_clustered, state_boundaries, which_clusters = 4)
-
